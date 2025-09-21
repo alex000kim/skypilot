@@ -41,6 +41,11 @@ if [ "$AUTO_BUILD" = true ]; then
         --port $PORT
 else
     rm -rf build docs
+    
+    # Set build environment (only if not already set by GitHub Actions)
+    if [ -z "$SPHINX_BUILD_PRODUCTION" ]; then
+        export SPHINX_BUILD_LOCAL=true
+    fi
 
     # MacOS and GNU `script` have different usages
     if [ "$(uname -s)" = "Linux" ]; then
