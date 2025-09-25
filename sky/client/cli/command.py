@@ -3354,6 +3354,106 @@ def check(infra_list: Tuple[str],
         click.style(f'Using SkyPilot API server: {api_server_url}', fg='green'))
 
 
+@cli.command(cls=_DocumentedCodeCommand)
+@flags.config_option(expose_value=False)
+@usage_lib.entrypoint
+def doctor():
+    """Show comprehensive system information for debugging.
+
+    This command consolidates useful debugging information including SkyPilot
+    version, API server status, platform details, and system configuration.
+    This is helpful when reporting issues or troubleshooting problems.
+
+    Example:
+
+    .. code-block:: bash
+
+      sky doctor
+    """
+    import platform
+
+    click.echo(f'{colorama.Fore.CYAN}{colorama.Style.BRIGHT}'
+               f'SkyPilot System Information'
+               f'{colorama.Style.RESET_ALL}\n')
+
+    # SkyPilot version information
+    click.echo(f'{colorama.Fore.GREEN}SkyPilot Version:{colorama.Style.RESET_ALL}')
+    click.echo(f'  Version: {sky.__version__}')
+    click.echo(f'  Commit: {sky.__commit__}')
+
+    # Platform information
+    click.echo(f'\n{colorama.Fore.GREEN}Platform Information:{colorama.Style.RESET_ALL}')
+    click.echo(f'  OS: {platform.system()}')
+    click.echo(f'  OS Version: {platform.platform()}')
+    click.echo(f'  Architecture: {platform.machine()}')
+    click.echo(f'  Python Version: {platform.python_version()}')
+    click.echo(f'  Python Path: {sys.executable}')
+
+    # SkyPilot installation info
+    click.echo(f'\n{colorama.Fore.GREEN}SkyPilot Installation:{colorama.Style.RESET_ALL}')
+    click.echo(f'  SkyPilot Root Directory: {sky.__root_dir__}')
+
+    # Import modules needed for config and server info
+    from sky import skypilot_config
+    from sky.skylet import constants
+    from sky.server import common as server_common
+
+    # Configuration information
+    click.echo(f'\n{colorama.Fore.GREEN}Configuration:{colorama.Style.RESET_ALL}')
+    config_path = skypilot_config.resolve_user_config_path()
+    if config_path:
+        click.echo(f'  Config File: {config_path}')
+    else:
+        click.echo('  Config File: Using defaults (no config file found)')
+
+    # API Server information
+    click.echo(f'\n{colorama.Fore.GREEN}API Server Information:{colorama.Style.RESET_ALL}')
+    try:
+        url = server_common.get_server_url()
+        click.echo(f'  Server URL: {url}')
+
+        api_server_info = sdk.api_info()
+        click.echo(f'  Status: {api_server_info.status}')
+        click.echo(f'  Version: {api_server_info.version}')
+        click.echo(f'  Commit: {api_server_info.commit}')
+
+        api_server_user = api_server_info.user
+        if api_server_user is not None:
+            user = api_server_user
+        else:
+            user = models.User.get_current_user()
+        click.echo(f'  User: {user.name} ({user.id})')
+
+        # Determine where the endpoint is set
+        config = skypilot_config.get_user_config()
+        config = dict(config)
+        if constants.SKY_API_SERVER_URL_ENV_VAR in os.environ:
+            location = ('Endpoint set via environment variable '
+                       f'{constants.SKY_API_SERVER_URL_ENV_VAR}')
+        elif 'endpoint' in config.get('api_server', {}):
+            location = f'Endpoint set via config file'
+        else:
+            location = 'Using default local API server'
+        click.echo(f'  Endpoint Source: {location}')
+
+    except Exception as e:
+        click.echo(f'  Status: {colorama.Fore.RED}Error connecting to API server: {e}{colorama.Style.RESET_ALL}')
+
+    # Enabled clouds (basic info)
+    click.echo(f'\n{colorama.Fore.GREEN}Cloud Status:{colorama.Style.RESET_ALL}')
+    try:
+        enabled_clouds = sdk.get(sdk.enabled_clouds())
+        if enabled_clouds:
+            click.echo(f'  Enabled Clouds: {", ".join(enabled_clouds)}')
+        else:
+            click.echo('  Enabled Clouds: None (run "sky check" for detailed cloud setup)')
+    except Exception as e:
+        click.echo(f'  Enabled Clouds: {colorama.Fore.YELLOW}Could not retrieve (run "sky check" for detailed cloud setup){colorama.Style.RESET_ALL}')
+
+    click.echo(f'\n{colorama.Fore.CYAN}For cloud-specific setup and troubleshooting, run: '
+               f'{colorama.Style.BRIGHT}sky check{colorama.Style.RESET_ALL}')
+
+
 @cli.command()
 @flags.config_option(expose_value=False)
 @click.argument('accelerator_str', required=False)
