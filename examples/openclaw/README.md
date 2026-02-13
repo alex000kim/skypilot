@@ -30,7 +30,9 @@ sky launch -c openclaw openclaw.yaml --env ANTHROPIC_API_KEY
 ssh -L 18789:localhost:18789 openclaw
 ```
 
-Then open http://localhost:18789 in your browser. On first launch, the gateway auth token is printed in the setup logs - enter it in the WebChat Settings panel to connect. On subsequent launches, the token is reused from the persisted config; retrieve it with `grep token ~/.openclaw/openclaw.json`.
+The WebChat port is bound to `localhost` on the VM and is not exposed to the public internet - it is only reachable through the SSH tunnel.
+
+Open http://localhost:18789 in your browser. On first launch, the gateway auth token is printed in the setup logs - enter it in the WebChat Settings panel to connect. On subsequent launches, the token is reused from the persisted config; retrieve it with `grep token ~/.openclaw/openclaw.json`.
 
 <p align="center">
   <img src="https://i.imgur.com/gdF6JDX.png" alt="OpenClaw Gateway Dashboard" width="600">
