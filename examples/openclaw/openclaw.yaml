@@ -8,14 +8,8 @@
 # providing an isolated sandbox environment separate from your local machine.
 # Access the built-in WebChat interface via SSH tunnel for secure access.
 #
-# All state (config, credentials, conversation history, WhatsApp session,
-# workspace files) is persisted to an S3 bucket so you can tear down and
-# relaunch without losing anything.
-#
 # Prerequisites:
 #   An Anthropic API key (https://console.anthropic.com/)
-#   AWS credentials configured for S3 access (sky check)
-#   An S3 bucket for state persistence (aws s3 mb s3://openclaw-state)
 #
 # Usage:
 #   # Launch the gateway:
@@ -31,11 +25,11 @@
 #   ssh openclaw
 #   openclaw onboard
 #
-#   # Tear down when done — all state is preserved in the S3 bucket:
-#   sky down openclaw
+#   # Stop when done — all state is preserved on disk:
+#   sky stop openclaw
 #
-#   # Relaunch later — picks up right where you left off:
-#   sky launch -c openclaw openclaw.yaml --env ANTHROPIC_API_KEY
+#   # Resume later — picks up right where you left off:
+#   sky start openclaw
 
 resources:
   cpus: 2+
@@ -44,18 +38,6 @@ resources:
 envs:
   # Anthropic API key (pass via --env ANTHROPIC_API_KEY=sk-ant-...)
   ANTHROPIC_API_KEY:
-  # S3 bucket name for persisting all OpenClaw state.
-  # Change this to use your own bucket name.
-  OPENCLAW_BUCKET: openclaw-state
-
-file_mounts:
-  # Persist all OpenClaw state to an S3 bucket across cluster
-  # teardowns and relaunches. Uses MOUNT_CACHED (rclone) instead of
-  # MOUNT (goofys) because OpenClaw uses appendFileSync for session
-  # transcripts, which requires full POSIX write support.
-  ~/.openclaw:
-    source: s3://${OPENCLAW_BUCKET}
-    mode: MOUNT_CACHED
 
 setup: |
   # Install Node.js 22 (required by OpenClaw)
@@ -68,8 +50,9 @@ setup: |
   sudo npm install -g openclaw@latest
 
   # Only write configuration on first launch.
-  # On subsequent launches the S3-backed mount already has our config.
+  # On subsequent launches the existing config is reused.
   if [ ! -f ~/.openclaw/openclaw.json ]; then
+    mkdir -p ~/.openclaw
     GATEWAY_TOKEN=$(openssl rand -hex 16)
     echo "=========================================="
     echo "First launch — generating new WebChat token: $GATEWAY_TOKEN"
@@ -95,7 +78,7 @@ setup: |
   EOF
   else
     echo "=========================================="
-    echo "Existing configuration found in S3 bucket — reusing."
+    echo "Existing configuration found — reusing."
     echo "All previous state (credentials, sessions, etc.) is intact."
     echo "=========================================="
   fi
