@@ -2,6 +2,8 @@
 
 Deploy [OpenClaw](https://github.com/openclaw/openclaw) - a personal AI assistant for WhatsApp, Telegram, Slack, Discord, and more - on a cloud VM via SkyPilot.
 
+![Local vs Cloud](https://raw.githubusercontent.com/skypilot-org/skypilot/master/examples/openclaw/local_vs_cloud.png)
+
 This gives you an isolated sandbox environment separate from your local machine, with the built-in WebChat interface accessible via SSH tunnel.
 
 ## Prerequisites
