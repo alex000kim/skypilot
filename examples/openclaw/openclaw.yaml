@@ -35,7 +35,7 @@ resources:
   cpus: 2+
   memory: 4+
 
-envs:
+secrets:
   # Anthropic API key (pass via --env ANTHROPIC_API_KEY=sk-ant-...)
   ANTHROPIC_API_KEY:
 
