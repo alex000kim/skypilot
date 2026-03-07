@@ -51,39 +51,14 @@ SkyPilot gives **AI teams** a simple interface to run jobs on any infra.
 - [Dec 2025] **SkyPilot v0.11** released: Multi-Cloud Pools, Fast Managed Jobs, Enterprise-Readiness at Large Scale, Programmability. [**Release notes**](https://github.com/skypilot-org/skypilot/releases/tag/v0.11.0)
 - [Dec 2025] **SkyPilot Pools** released: Run batch inference and other jobs on a managed pool of warm workers (across clouds or clusters). [**blog**](https://blog.skypilot.co/skypilot-pools-deepseek-ocr/), [**docs**](https://docs.skypilot.co/en/latest/examples/pools.html)
 - [Dec 2025] Train **an agent to use Google Search** as a tool with RL on your Kubernetes or clouds: [**blog**](https://blog.skypilot.co/verl-tool-calling/), [**example**](./llm/verl/)
-- [Nov 2025] Serve **Kimi K2 Thinking** with reasoning capabilities on your Kubernetes or clouds: [**example**](./llm/kimi-k2-thinking/)
-- [Oct 2025] Run **RL training for LLMs** with SkyRL on your Kubernetes or clouds: [**example**](./llm/skyrl/)
-- [Oct 2025] Train and serve [Andrej Karpathy's](https://x.com/karpathy/status/1977755427569111362) **nanochat** - the best ChatGPT that $100 can buy: [**example**](./llm/nanochat)
-- [Oct 2025] Run large-scale **LLM training with TorchTitan** on any AI infra: [**example**](./examples/training/torchtitan)
-- [Sep 2025] Scaling AI infrastructure at Abridge - **10x faster development** with SkyPilot: [**blog**](https://blog.skypilot.co/abridge/)
-- [Sep 2025] Network and Storage Benchmarks for LLM training on the cloud: [**blog**](https://maknee.github.io/blog/2025/Network-And-Storage-Training-Skypilot/)
-- [Aug 2025] Serve and finetune **OpenAI GPT-OSS models** (gpt-oss-120b, gpt-oss-20b) with one command on any infra: [**serve**](./llm/gpt-oss/) + [**LoRA and full finetuning**](./llm/gpt-oss-finetuning/)
-- [Jul 2025] Run distributed **RL training for LLMs** with Verl (PPO, GRPO) on any cloud: [**example**](./llm/verl/)
 
 ## Overview
 
-SkyPilot **is easy to use for AI teams**:
-- Quickly spin up compute on your own infra
-- Environment and job as code — simple and portable
-- Easy job management: queue, run, and auto-recover many jobs
-
-SkyPilot **makes Kubernetes easy for AI & Infra teams**:
-
-- Slurm-like ease of use, cloud-native robustness
-- Local dev experience on K8s: SSH into pods, sync code, or connect IDE
-- Turbocharge your clusters: gang scheduling, multi-cluster, and scaling
-
-SkyPilot **unifies multiple clusters, clouds, and hardware**:
-- One interface to use reserved GPUs, Kubernetes clusters, Slurm clusters, or 20+ clouds
-- [Flexible provisioning](https://docs.skypilot.co/en/latest/examples/auto-failover.html) of GPUs, TPUs, CPUs, with auto-retry
-- [Team deployment](https://docs.skypilot.co/en/latest/reference/api-server/api-server.html) and resource sharing
-
-SkyPilot **cuts your cloud costs & maximizes GPU availability**:
-* Autostop: automatic cleanup of idle resources
-* [Spot instance support](https://docs.skypilot.co/en/latest/examples/managed-jobs.html#running-on-spot-instances): 3-6x cost savings, with preemption auto-recovery
-* Intelligent scheduling: automatically run on the cheapest & most available infra
-
-SkyPilot supports your existing GPU, TPU, and CPU workloads, with no code changes.
+- **Simple**: Spin up compute, manage jobs, and auto-recover — with a unified YAML/Python API
+- **Kubernetes-native**: Slurm-like UX, gang scheduling, multi-cluster, local dev experience on K8s
+- **Multi-cloud**: One interface across reserved GPUs, Kubernetes, Slurm, and 20+ clouds, with [auto-failover](https://docs.skypilot.co/en/latest/examples/auto-failover.html)
+- **Cost-efficient**: Autostop, [spot instances](https://docs.skypilot.co/en/latest/examples/managed-jobs.html#running-on-spot-instances) (3-6x savings), and intelligent scheduling
+- **No code changes**: Drop in your existing GPU, TPU, and CPU workloads
 
 Install with pip:
 ```bash
@@ -127,22 +102,16 @@ Paste the following into a file `my_task.yaml`:
 
 ```yaml
 resources:
-  accelerators: A100:8  # 8x NVIDIA A100 GPU
+  accelerators: A100:8
 
-num_nodes: 1  # Number of VMs to launch
+num_nodes: 1
 
-# Working directory (optional) containing the project codebase.
-# Its contents are synced to ~/sky_workdir/ on the cluster.
 workdir: ~/torch_examples
 
-# Commands to be run before executing the job.
-# Typical use: pip install -r requirements.txt, git clone, etc.
 setup: |
   cd mnist
   pip install -r requirements.txt
 
-# Commands to run as a job.
-# Typical use: launch the main program.
 run: |
   cd mnist
   python main.py --epochs 1
@@ -158,14 +127,7 @@ Launch with `sky launch` (note: [access to GPU instances](https://docs.skypilot.
 sky launch my_task.yaml
 ```
 
-SkyPilot then performs the heavy-lifting for you, including:
-1. Find the cheapest & available infra across your clusters or clouds
-2. Provision the GPUs (pods or VMs), with auto-failover if the infra returned capacity errors
-3. Sync your local `workdir` to the provisioned cluster
-4. Auto-install dependencies by running the task's `setup` commands
-5. Run the task's `run` commands, and stream logs
-
-See [Quickstart](https://docs.skypilot.co/en/latest/getting-started/quickstart.html) to get started with SkyPilot.
+SkyPilot finds the cheapest available infra, provisions GPUs, syncs your workdir, runs setup, and streams logs. See [Quickstart](https://docs.skypilot.co/en/latest/getting-started/quickstart.html) to get started.
 
 ## Runnable examples
 
@@ -184,26 +146,12 @@ Latest featured examples:
 Source files can be found in [`llm/`](https://github.com/skypilot-org/skypilot/tree/master/llm) and [`examples/`](https://github.com/skypilot-org/skypilot/tree/master/examples).
 
 ## More information
-To learn more, see [SkyPilot Overview](https://docs.skypilot.co/en/latest/overview.html), [SkyPilot docs](https://docs.skypilot.co/en/latest/), and [SkyPilot blog](https://blog.skypilot.co/).
 
-SkyPilot adopters: [Testimonials and Case Studies](https://blog.skypilot.co/case-studies/)
+- [Docs](https://docs.skypilot.co/en/latest/) · [Blog](https://blog.skypilot.co/) · [Case Studies](https://blog.skypilot.co/case-studies/) · [Community](https://blog.skypilot.co/community/)
+- Follow: [Slack](http://slack.skypilot.co) · [X](https://twitter.com/skypilot_org) · [LinkedIn](https://www.linkedin.com/company/skypilot-oss/)
+- Research: [SkyPilot (NSDI '23)](https://www.usenix.org/system/files/nsdi23-yang-zongheng.pdf) · [SkyServe (EuroSys '25)](https://arxiv.org/pdf/2411.01438) · [Spot policy (NSDI '24)](https://www.usenix.org/conference/nsdi24/presentation/wu-zhanghao) · [Sky Computing](https://arxiv.org/abs/2205.07147)
 
-Partners and integrations: [Community Spotlights](https://blog.skypilot.co/community/)
-
-Follow updates:
-- [Slack](http://slack.skypilot.co)
-- [X / Twitter](https://twitter.com/skypilot_org)
-- [LinkedIn](https://www.linkedin.com/company/skypilot-oss/)
-- [SkyPilot Blog](https://blog.skypilot.co/) ([Introductory blog post](https://blog.skypilot.co/introducing-skypilot/))
-
-Read the research:
-- [SkyPilot paper](https://www.usenix.org/system/files/nsdi23-yang-zongheng.pdf) and [talk](https://www.usenix.org/conference/nsdi23/presentation/yang-zongheng) (NSDI 2023)
-- [Sky Computing whitepaper](https://arxiv.org/abs/2205.07147)
-- [Sky Computing vision paper](https://sigops.org/s/conferences/hotos/2021/papers/hotos21-s02-stoica.pdf) (HotOS 2021)
-- [SkyServe: AI serving across regions and clouds](https://arxiv.org/pdf/2411.01438) (EuroSys 2025)
-- [Managed jobs spot instance policy](https://www.usenix.org/conference/nsdi24/presentation/wu-zhanghao)  (NSDI 2024)
-
-SkyPilot was initially started at the [Sky Computing Lab](https://sky.cs.berkeley.edu) at UC Berkeley and has since gained many industry contributors. To read about the project's origin and vision, see [Concept: Sky Computing](https://docs.skypilot.co/en/latest/sky-computing.html).
+SkyPilot was started at the [Sky Computing Lab](https://sky.cs.berkeley.edu) at UC Berkeley. See [Concept: Sky Computing](https://docs.skypilot.co/en/latest/sky-computing.html) for the project's origin and vision.
 
 ## Questions and feedback
 We are excited to hear your feedback:
