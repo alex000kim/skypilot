@@ -27,8 +27,7 @@ def _get_repo_root():
 
 
 REPO_ROOT = _get_repo_root()
-REFERENCES_DIR = os.path.join(REPO_ROOT, 'skills', 'skypilot',
-                              'references')
+REFERENCES_DIR = os.path.join(REPO_ROOT, 'skills', 'skypilot', 'references')
 
 # ---------------------------------------------------------------------------
 # YAML Spec Generation
