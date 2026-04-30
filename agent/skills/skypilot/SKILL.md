@@ -10,17 +10,18 @@ Slurm, and SSH node pools. Treat it as the agent's primary control plane for
 provisioning, job execution, logs, status, and cleanup. Use SSH only when the
 SkyPilot CLI view is not enough to diagnose or repair the remote workload.
 
-Keep this file loaded as the always-needed operating guide. Load references only
-when the task needs details:
+Keep this file loaded as the always-needed operating guide. The following files
+are bundled with this skill under its `references/` directory; load them relative
+to this `SKILL.md`, not relative to the user's current repository:
 
-- [CLI Reference](references/cli-reference.md): exact commands and flags
-- [YAML Specification](references/yaml-spec.md): full task schema
-- [Python SDK](references/python-sdk.md): programmatic use
-- [Advanced Patterns](references/advanced-patterns.md): multi-cloud,
-  distributed training, production patterns
-- [Troubleshooting](references/troubleshooting.md): installation, credentials,
-  cloud/provider errors
-- [Examples](references/examples.md): copy-paste task YAML examples
+- `references/cli-reference.md`: exact commands and flags
+- `references/yaml-spec.md`: full task schema
+- `references/python-sdk.md`: programmatic use
+- `references/advanced-patterns.md`: multi-cloud, distributed training,
+  production patterns
+- `references/troubleshooting.md`: installation, credentials, cloud/provider
+  errors
+- `references/examples.md`: copy-paste task YAML examples
 
 ## Must-Know Agent Rules
 
@@ -271,8 +272,8 @@ run: |
 ```
 
 Use `envs:` plus CLI `--env` for routine parameters. Use `--secret` or
-`secrets:` for credentials. See [YAML Specification](references/yaml-spec.md) for
-file mounts, service blocks, volumes, multi-node fields, and advanced resource
+`secrets:` for credentials. See the bundled `references/yaml-spec.md` for file
+mounts, service blocks, volumes, multi-node fields, and advanced resource
 syntax.
 
 ## Common Mistakes
