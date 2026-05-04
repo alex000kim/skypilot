@@ -2,6 +2,7 @@
 import enum
 import fcntl
 import hashlib
+import importlib
 import os
 import pathlib
 import pty
@@ -23,7 +24,6 @@ import colorama
 
 from sky import exceptions
 from sky import sky_logging
-from sky.data import storage_utils
 from sky.skylet import constants
 from sky.skylet import log_lib
 from sky.utils import auth_utils
@@ -479,18 +479,22 @@ class CommandRunner:
             # filter treats all patterns as excludes, silently ignoring
             # negation. By delegating to git, we get proper semantics.
             try:
+                # Import here to avoid a circular import during `import sky`:
+                # command_runner -> sky.data -> storage -> clouds/provision.
+                storage_utils = importlib.import_module(
+                    'sky.data.storage_utils')
                 excluded_files = (
                     storage_utils.get_excluded_files_from_gitignore(
                         str(resolved_source)))
                 if excluded_files:
                     with tempfile.NamedTemporaryFile(
-                        mode='w',
-                        prefix='skypilot_rsync_exclude_',
-                        suffix='.txt',
-                        delete=False) as exclude_tmp_file:
+                            mode='w',
+                            prefix='skypilot_rsync_exclude_',
+                            suffix='.txt',
+                            delete=False,
+                            encoding='utf-8') as exclude_tmp_file:
                         exclude_tmp_file_path = exclude_tmp_file.name
-                        exclude_tmp_file.write('\n'.join(excluded_files) +
-                                               '\n')
+                        exclude_tmp_file.write('\n'.join(excluded_files) + '\n')
                     rsync_command.append(
                         RSYNC_EXCLUDE_OPTION.format(
                             shlex.quote(exclude_tmp_file_path)))
@@ -498,15 +502,15 @@ class CommandRunner:
                 # If git-based exclusion fails unexpectedly, fall back to
                 # rsync's native filter. This is best-effort because native
                 # rsync filters do not support Git negation semantics.
-                logger.debug('Failed to get git-based excludes, falling back '
-                             'to rsync filter.',
-                             exc_info=True)
+                logger.debug(
+                    'Failed to get git-based excludes, falling back '
+                    'to rsync filter.',
+                    exc_info=True)
                 rsync_command.append(RSYNC_FILTER_GITIGNORE)
                 if (resolved_source / GIT_EXCLUDE).exists():
                     rsync_command.append(
                         RSYNC_EXCLUDE_OPTION.format(
-                            shlex.quote(
-                                str(resolved_source / GIT_EXCLUDE))))
+                            shlex.quote(str(resolved_source / GIT_EXCLUDE))))
         elif up:
             # Source is a file or does not exist locally; let rsync surface
             # source errors and avoid evaluating directory ignore files.

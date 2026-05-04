@@ -424,7 +424,8 @@ def test_get_excluded_files_non_git_dir_ignores_global_gitignore():
             with open(os.path.join(source_dir, filename), 'w') as f:
                 f.write('content')
 
-        with mock.patch.dict(os.environ, {'GIT_CONFIG_GLOBAL': git_config_path}):
+        with mock.patch.dict(os.environ,
+                             {'GIT_CONFIG_GLOBAL': git_config_path}):
             excluded_files = storage_utils.get_excluded_files_from_gitignore(
                 source_dir)
         norm_excluded_files = [os.path.normpath(f) for f in excluded_files]
@@ -450,7 +451,8 @@ def test_get_excluded_files_git_repo_uses_global_gitignore():
             with open(os.path.join(source_dir, filename), 'w') as f:
                 f.write('content')
 
-        with mock.patch.dict(os.environ, {'GIT_CONFIG_GLOBAL': git_config_path}):
+        with mock.patch.dict(os.environ,
+                             {'GIT_CONFIG_GLOBAL': git_config_path}):
             excluded_files = storage_utils.get_excluded_files_from_gitignore(
                 source_dir)
         norm_excluded_files = [os.path.normpath(f) for f in excluded_files]

@@ -435,8 +435,7 @@ def test_rsync_up_uses_git_excludes_for_gitignore_negation() -> None:
                   'w',
                   encoding='utf-8') as f:
             f.write('secret\n')
-        with open(os.path.join(source, '.gitignore'),
-                  'w',
+        with open(os.path.join(source, '.gitignore'), 'w',
                   encoding='utf-8') as f:
             f.write('scripts/*\n!scripts/entrypoint.sh\n')
 
@@ -481,8 +480,7 @@ def test_rsync_up_uses_gitignore_negation_outside_git_repo() -> None:
                   'w',
                   encoding='utf-8') as f:
             f.write('secret\n')
-        with open(os.path.join(source, '.gitignore'),
-                  'w',
+        with open(os.path.join(source, '.gitignore'), 'w',
                   encoding='utf-8') as f:
             f.write('scripts/*\n!scripts/entrypoint.sh\n')
 
