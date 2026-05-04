@@ -23,6 +23,7 @@ import colorama
 
 from sky import exceptions
 from sky import sky_logging
+from sky.data import storage_utils
 from sky.skylet import constants
 from sky.skylet import log_lib
 from sky.utils import auth_utils
@@ -56,8 +57,10 @@ RSYNC_DISPLAY_OPTION = '-Pavz'
 # Note that "-" is mandatory for rsync and means all patterns in the ignore
 # files are treated as *exclude* patterns.  Non-exclude patterns, e.g., "!
 # do_not_exclude" doesn't work, even though git allows it.
-# TODO(cooperc): Avoid using this, and prefer utils in storage_utils instead for
-# consistency between bucket upload and rsync.
+# For .gitignore uploads, we use storage_utils.get_excluded_files_from_gitignore
+# which delegates to `git ls-files` for correct negation pattern handling. The
+# .gitignore filter below is still used as a best-effort fallback and for
+# downloads.
 RSYNC_FILTER_SKYIGNORE = f'--filter=\'dir-merge,- {constants.SKY_IGNORE_FILE}\''
 RSYNC_FILTER_GITIGNORE = f'--filter=\'dir-merge,- {constants.GIT_IGNORE_FILE}\''
 # The git exclude file to support.
@@ -467,21 +470,52 @@ class CommandRunner:
         # --filter
         # The source is a local path, so we need to resolve it.
         resolved_source = pathlib.Path(source).expanduser().resolve()
+        exclude_tmp_file_path = None
         if (resolved_source / constants.SKY_IGNORE_FILE).exists():
             rsync_command.append(RSYNC_FILTER_SKYIGNORE)
-        else:
-            rsync_command.append(RSYNC_FILTER_GITIGNORE)
-            if up:
-                # Build --exclude-from argument.
-                if (resolved_source / GIT_EXCLUDE).exists():
-                    # Ensure file exists; otherwise, rsync will error out.
-                    #
-                    # We shlex.quote() because the path may contain spaces:
-                    #   'my dir/.git/info/exclude'
-                    # Without quoting rsync fails.
+        elif up and resolved_source.is_dir():
+            # For uploads, use git ls-files to correctly handle .gitignore
+            # negation patterns (e.g., "!important.txt"). Rsync's dir-merge
+            # filter treats all patterns as excludes, silently ignoring
+            # negation. By delegating to git, we get proper semantics.
+            try:
+                excluded_files = (
+                    storage_utils.get_excluded_files_from_gitignore(
+                        str(resolved_source)))
+                if excluded_files:
+                    with tempfile.NamedTemporaryFile(
+                        mode='w',
+                        prefix='skypilot_rsync_exclude_',
+                        suffix='.txt',
+                        delete=False) as exclude_tmp_file:
+                        exclude_tmp_file_path = exclude_tmp_file.name
+                        exclude_tmp_file.write('\n'.join(excluded_files) +
+                                               '\n')
                     rsync_command.append(
                         RSYNC_EXCLUDE_OPTION.format(
-                            shlex.quote(str(resolved_source / GIT_EXCLUDE))))
+                            shlex.quote(exclude_tmp_file_path)))
+            except Exception:  # pylint: disable=broad-except
+                # If git-based exclusion fails unexpectedly, fall back to
+                # rsync's native filter. This is best-effort because native
+                # rsync filters do not support Git negation semantics.
+                logger.debug('Failed to get git-based excludes, falling back '
+                             'to rsync filter.',
+                             exc_info=True)
+                rsync_command.append(RSYNC_FILTER_GITIGNORE)
+                if (resolved_source / GIT_EXCLUDE).exists():
+                    rsync_command.append(
+                        RSYNC_EXCLUDE_OPTION.format(
+                            shlex.quote(
+                                str(resolved_source / GIT_EXCLUDE))))
+        elif up:
+            # Source is a file or does not exist locally; let rsync surface
+            # source errors and avoid evaluating directory ignore files.
+            pass
+        else:
+            # For downloads, use rsync's native filter as before. Download-side
+            # .gitignore files are on the remote source and cannot be evaluated
+            # locally with git.
+            rsync_command.append(RSYNC_FILTER_GITIGNORE)
 
         if rsh_option is not None:
             rsync_command.append(f'-e {shlex.quote(rsh_option)}')
@@ -528,19 +562,27 @@ class CommandRunner:
         command = ' '.join(rsync_command)
         logger.debug(f'Running rsync command: {command}')
 
-        backoff = common_utils.Backoff(initial_backoff=5, max_backoff_factor=5)
-        assert max_retry > 0, f'max_retry {max_retry} must be positive.'
-        while max_retry >= 0:
-            returncode, stdout, stderr = log_lib.run_with_log(
-                command,
-                log_path=log_path,
-                stream_logs=stream_logs,
-                shell=True,
-                require_outputs=True)
-            if returncode == 0:
-                break
-            max_retry -= 1
-            time.sleep(backoff.current_backoff())
+        try:
+            backoff = common_utils.Backoff(initial_backoff=5,
+                                           max_backoff_factor=5)
+            assert max_retry > 0, f'max_retry {max_retry} must be positive.'
+            while max_retry >= 0:
+                returncode, stdout, stderr = log_lib.run_with_log(
+                    command,
+                    log_path=log_path,
+                    stream_logs=stream_logs,
+                    shell=True,
+                    require_outputs=True)
+                if returncode == 0:
+                    break
+                max_retry -= 1
+                time.sleep(backoff.current_backoff())
+        finally:
+            if exclude_tmp_file_path is not None:
+                try:
+                    os.unlink(exclude_tmp_file_path)
+                except OSError:
+                    pass
 
         direction = 'up' if up else 'down'
         error_msg = (f'Failed to rsync {direction}: {source} -> {target}. '

@@ -5,6 +5,7 @@ import pathlib
 import shlex
 import stat
 import subprocess
+import tempfile
 from typing import List, Optional, Set, TextIO, Union
 import warnings
 import zipfile
@@ -58,12 +59,74 @@ def get_excluded_files_from_skyignore(src_dir_path: str) -> List[str]:
     return list(excluded_list)
 
 
+def _run_git_ls_files_for_ignored_paths(
+        src_dir_path: str,
+        git_dir: Optional[str] = None,
+        use_standard_excludes: bool = True) -> List[str]:
+    if git_dir is None:
+        git_dir_args = f'-C {shlex.quote(src_dir_path)}'
+    else:
+        git_dir_args = (f'--git-dir={shlex.quote(git_dir)} '
+                        f'--work-tree={shlex.quote(src_dir_path)}')
+    if use_standard_excludes:
+        exclude_args = '--exclude-standard'
+    else:
+        exclude_args = '--exclude-per-directory=.gitignore'
+
+    # This command outputs a list to be excluded according to .gitignore,
+    # .git/info/exclude, and global exclude config when use_standard_excludes
+    # is True. Otherwise, only .gitignore files are used.
+    # -z: filenames terminated by \0 instead of \n
+    # --others: show untracked files
+    # --ignore: out of untracked files, only show ignored files
+    # --exclude-standard: use standard exclude rules (required for --ignore);
+    # --exclude-per-directory: use per-directory .gitignore files only.
+    # --directory: if an entire directory is ignored, collapse to a single
+    #              entry rather than listing every single file
+    # Since we are using --others instead of --cached, this will not show
+    # files that are tracked but also present in .gitignore.
+    filter_cmd = (f'git -c safe.directory="*" {git_dir_args} '
+                  f'ls-files -z --others --ignore {exclude_args} --directory')
+    output = subprocess.run(filter_cmd,
+                            shell=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            check=True,
+                            text=True)
+    # Don't catch any errors here. Callers decide which failures are expected
+    # enough to degrade gracefully.
+
+    output_list = output.stdout.split('\0')
+    # Trim the empty string at the end.
+    return output_list[:-1]
+
+
+def _get_excluded_files_from_gitignore_without_repo(
+        src_dir_path: str) -> List[str]:
+    """Evaluates .gitignore for a directory outside a Git repository."""
+    with tempfile.TemporaryDirectory(prefix='skypilot_gitignore_') as temp_dir:
+        subprocess.run(f'git init --quiet {shlex.quote(temp_dir)}',
+                       shell=True,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                       check=True,
+                       text=True)
+        return _run_git_ls_files_for_ignored_paths(
+            src_dir_path,
+            git_dir=os.path.join(temp_dir, '.git'),
+            use_standard_excludes=False)
+
+
 def get_excluded_files_from_gitignore(src_dir_path: str) -> List[str]:
     """ Lists files and patterns ignored by git in the source directory
 
     Runs `git ls-files --ignored ...` which returns a list of excluded files and
-    patterns read from .gitignore and .git/info/exclude using git.
-    This will also be run for all submodules under the src_dir_path.
+    patterns read from .gitignore and .git/info/exclude using git. This will
+    also be run for all submodules under the src_dir_path.
+
+    If src_dir_path is not in a Git repository, this uses temporary Git
+    metadata to evaluate any .gitignore files with Git's pattern
+    semantics without modifying src_dir_path.
 
     Returns:
         List[str] containing files and folders to be ignored. There won't be any
@@ -97,14 +160,9 @@ def get_excluded_files_from_gitignore(src_dir_path: str) -> List[str]:
 
         if (e.returncode == exceptions.GIT_FATAL_EXIT_CODE and
                 'not a git repository' in e.stderr):
-            # If git failed because we aren't in a git repository, but there is
-            # a .gitignore, warn the user that it will be ignored.
-            if os.path.exists(gitignore_path):
-                logger.warning('Detected a .gitignore file, but '
-                               f'{src_dir_path} is not a git repository. The '
-                               '.gitignore file will be ignored. '
-                               f'{_USE_SKYIGNORE_HINT}')
-            # Otherwise, this is fine and we can exit early.
+            if os.path.isdir(expand_src_dir_path):
+                return _get_excluded_files_from_gitignore_without_repo(
+                    expand_src_dir_path)
             return []
 
         if e.returncode == exceptions.COMMAND_NOT_FOUND_EXIT_CODE:
@@ -135,31 +193,7 @@ def get_excluded_files_from_gitignore(src_dir_path: str) -> List[str]:
     for repo in all_git_repos:
         # repo is the path relative to src_dir_path. Get the full path.
         repo_path = os.path.join(expand_src_dir_path, repo)
-        # This command outputs a list to be excluded according to .gitignore,
-        # .git/info/exclude, and global exclude config.
-        # -z: filenames terminated by \0 instead of \n
-        # --others: show untracked files
-        # --ignore: out of untracked files, only show ignored files
-        # --exclude-standard: use standard exclude rules (required for --ignore)
-        # --directory: if an entire directory is ignored, collapse to a single
-        #              entry rather than listing every single file
-        # Since we are using --others instead of --cached, this will not show
-        # files that are tracked but also present in .gitignore.
-        filter_cmd = (f'git -c safe.directory="*" '
-                      f'-C {shlex.quote(repo_path)} ls-files -z '
-                      '--others --ignore --exclude-standard --directory')
-        output = subprocess.run(filter_cmd,
-                                shell=True,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
-                                check=True,
-                                text=True)
-        # Don't catch any errors. We would only expect to see errors during the
-        # first git invocation - so if we see any here, crash.
-
-        output_list = output.stdout.split('\0')
-        # trim the empty string at the end
-        output_list = output_list[:-1]
+        output_list = _run_git_ls_files_for_ignored_paths(repo_path)
 
         for item in output_list:
 
